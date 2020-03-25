@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace ImageResizer
 {
@@ -26,6 +27,26 @@ namespace ImageResizer
                 {
                     File.Delete(item);
                 }
+            }
+        }
+
+        public async Task CleanAsync(string destPath)
+        {
+            if (!Directory.Exists(destPath))
+            {
+                Directory.CreateDirectory(destPath);
+            }
+            else
+            {
+                var allImageFiles = Directory.GetFiles(destPath, "*", SearchOption.AllDirectories);
+                var tasks = new List<Task>();
+                foreach (var item in allImageFiles)
+                {
+                    tasks.Add(Task.Run(() => { 
+                        File.Delete(item);
+                    }));
+                }
+                await Task.WhenAll(tasks);
             }
         }
 
@@ -56,6 +77,35 @@ namespace ImageResizer
                 string destFile = Path.Combine(destPath, imgName + ".jpg");
                 processedImage.Save(destFile, ImageFormat.Jpeg);
             }
+        }
+
+        public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale)
+        {
+            var allFiles = FindImages(sourcePath);
+            var allFilesTaskList = new List<Task>();
+            foreach (var filePath in allFiles)
+            {
+                //allFilesTaskList.Add(ProcessImage(filePath, destPath, scale));
+                allFilesTaskList.Add(Task.Run(() =>
+                {
+                    Image imgPhoto = Image.FromFile(filePath);
+                    string imgName = Path.GetFileNameWithoutExtension(filePath);
+
+                    int sourceWidth = imgPhoto.Width;
+                    int sourceHeight = imgPhoto.Height;
+
+                    int destionatonWidth = (int)(sourceWidth * scale);
+                    int destionatonHeight = (int)(sourceHeight * scale);
+
+                    Bitmap processedImage = processBitmap((Bitmap)imgPhoto,
+                        sourceWidth, sourceHeight,
+                        destionatonWidth, destionatonHeight);
+
+                    string destFile = Path.Combine(destPath, imgName + ".jpg");
+                    processedImage.Save(destFile, ImageFormat.Jpeg);
+                }));
+            }
+            await Task.WhenAll(allFilesTaskList);
         }
 
         /// <summary>

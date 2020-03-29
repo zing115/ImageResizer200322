@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ImageResizer
@@ -81,6 +82,11 @@ namespace ImageResizer
 
         public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale)
         {
+            await ResizeImagesAsync(sourcePath, destPath, scale, CancellationToken.None);
+        }
+
+        public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale, CancellationToken token)
+        {
             var allFiles = FindImages(sourcePath);
             var allFilesTaskList = new List<Task>();
             foreach (var filePath in allFiles)
@@ -103,9 +109,12 @@ namespace ImageResizer
 
                     string destFile = Path.Combine(destPath, imgName + ".jpg");
                     processedImage.Save(destFile, ImageFormat.Jpeg);
-                }));
+                }, token));
             }
-            await Task.WhenAll(allFilesTaskList);
+            await Task.WhenAll(allFilesTaskList).ContinueWith((t) => {
+                if (t.IsCanceled == true)
+                    Clean(destPath);
+            });
         }
 
         /// <summary>
